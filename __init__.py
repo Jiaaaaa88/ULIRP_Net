@@ -92,34 +92,21 @@ class CAOM(nn.Module):
 
         self.channel_adj = nn.Conv2d(self.out_channel + low_channel // squeeze_radio, self.out_channel, 1)
 
-        # 残差连接
         self.shortcut = nn.Conv2d(op_channel, self.out_channel, 1)
         self.norm = nn.BatchNorm2d(self.out_channel)
         self.relu = nn.ReLU()
 
     def forward(self, x):
         identity = self.shortcut(x)
-
-        # 分支处理
         up, low = torch.split(x, [self.up_channel, self.low_channel], dim=1)
         up, low = self.squeeze1(up), self.squeeze2(low)
-
-        # 多尺度特征提取
         Y1_3x3 = self.GWC_3x3(up)
         Y1_5x5 = self.GWC_5x5(up)
         Y1 = torch.cat([Y1_3x3, Y1_5x5], dim=1)
-
-        # 特征融合
         out = torch.cat([Y1, low], dim=1)
-
-        # 调整通道数
         out = self.channel_adj(out)
-
-        # 注意力引导
         attention_weights = self.attention(out)
         out = out * attention_weights
-
-        # 残差连接
         out = self.relu(self.norm(out + identity))
         return out
 
@@ -181,8 +168,6 @@ class Model(nn.Module):
     def load_pretrained_weights(self, model, checkpoint_path):
         state_dict = torch.load(checkpoint_path, map_location='cpu')
         model_state_dict = model.state_dict()
-
-        # 过滤掉不匹配的键
         filtered_state_dict = {k: v for k, v in state_dict.items() if
                                k in model_state_dict and v.size() == model_state_dict[k].size()}
 
